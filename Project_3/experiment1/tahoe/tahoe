@@ -1,0 +1,68 @@
+#!/usr/bin/python
+import sys
+import subprocess
+import os
+
+PATH      = os.path.dirname(os.path.realpath(__file__))
+os.chdir(PATH)
+
+if len(sys.argv) > 1:
+	# Initial Input CBR value
+    	INITIAL_CBR	=	sys.argv[1]
+else:
+   	print "Please provide a starting CBR number less than 10.5"
+	sys.exit()
+
+# Find out the path of NS
+NS	= 	subprocess.check_output("whereis ns | awk '{print $2}'", shell=True).strip()
+
+# Set the Maximum value of CBR
+MAXCBR	=	10.5
+
+# Increment factor
+INCREMENT_FACTOR	=	0.5
+
+# CBR Counter
+cbr = float(INITIAL_CBR)
+
+# Converter
+kbps_to_mbps = (1024*1024)
+
+# Flush the old file 
+subprocess.check_output("rm -f "+PATH+"/tahoethroughput.txt "+PATH+"/tahoedroprate.txt "+PATH+"/tahoelatency.txt",shell=True)
+
+f  = open(PATH+"/tahoethroughput.txt",'a')
+pd = open(PATH+"/tahoedroprate.txt",'a')
+l  = open(PATH+"/tahoelatency.txt",'a')
+
+while (cbr < MAXCBR):
+	# Call the TCL script
+	tcl_output = subprocess.check_output(NS+" "+PATH+"/tahoetcp.tcl "+str(cbr),shell=True).strip()
+
+	# Throughput calculations
+	tcl_output_result = (float(tcl_output)/kbps_to_mbps)
+	tcp_kbps_throughput = subprocess.check_output("awk -f "+PATH+"/tcp-throughput-generator.awk tahoe.tr",shell=True).strip()
+	f.write(str(cbr)+ " " + tcp_kbps_throughput+"\n")
+
+	# Drop rate calculations
+	packets_dropped = subprocess.check_output("awk '/^d/&&$3==1&&$5==\"tcp\"' tahoe.tr | wc -l",shell=True).strip()
+	packets_sent    = subprocess.check_output("awk '/^-/&&$3==0&&$5==\"tcp\"' tahoe.tr | wc -l",shell=True).strip()
+#	packets_dropped = subprocess.check_output("awk '/^d/&&$3==1&&$5==\"tcp\"' "+TRACEFILE+" | wc -l",shell=True).strip()
+#	packets_sent    = subprocess.check_output("awk '/^-/&&$3==0&&$5==\"tcp\"' "+TRACEFILE+" |wc -l",shell=True).strip()
+	drop_rate = float(packets_dropped)/float(packets_sent)
+	pd.write(str(cbr)+ " " + str(round ((drop_rate*100),2))+"\n")
+
+	# Latency calculations
+	latency = subprocess.check_output("awk -f "+PATH+"/tcp-delay-calculator.awk tahoe.tr",shell=True).strip()
+	latency_ms = round((float(latency) * 1000),3)
+	l.write(str(cbr)+ " " + str(latency_ms)+"\n")
+
+	cbr=cbr+INCREMENT_FACTOR
+ 
+f.close()
+pd.close()
+l.close()
+
+print "==============================="
+print "End of TCP Tahoe CBR Variations"
+print "==============================="

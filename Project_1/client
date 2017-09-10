@@ -1,0 +1,141 @@
+#!/usr/bin/python
+import socket
+import sys
+import ssl
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-p', action='store', 
+                    dest='portnumber',
+                    help='Supply a port number')
+parser.add_argument("-s", "--ssl", action="store_true", 
+                    default=0,
+                    dest='sslrequest',
+                    help='Provide this switch to turn on SSL connection')
+
+parser.add_argument("hostname", type=str, 
+                    help="either a DNS name or an IP address in dotted notation")
+parser.add_argument("NEUID", type=str, help="Northeastern University ID")
+
+args = parser.parse_args()
+
+GIVEN_PORT_NUMBER = args.portnumber
+
+if(GIVEN_PORT_NUMBER is None):
+	args.portnumber = "27993"
+	
+if(args.sslrequest):
+	if(GIVEN_PORT_NUMBER is None):
+		args.portnumber = "27994"
+
+#sys.exit()
+
+# CONSTANTS
+REMOTE_PORT     =       int(args.portnumber)
+SSL_REQUESTED   =       args.sslrequest
+REMOTE_HOST	 =    	 args.hostname
+#NEUID           =       "001611108"
+#NEUID           =       "001617243"
+NEUID		 =       args.NEUID
+
+BATCHIDENTIFIER     =   "cs5700fall2015"
+
+def getResult(argument1, op, argument2):
+    if(op == "+"):
+        return argument1+argument2
+    elif(op == "-"):
+        return argument1-argument2
+    elif(op == "*"):
+        return argument1*argument2
+    elif(op == "/"):
+        if(argument2 == 0):
+            closeAndExitConnection()
+        return argument1/argument2
+
+def closeAndExitConnection():
+    if(SSL_REQUESTED):
+        wrappedSocket.close()
+    else:
+        streamSocket.close()
+    sys.exit()
+    
+def messageFormatCheck(receivedData):
+    stringLength    =   len(receivedData)
+    streamServerDataList    =   receivedData.split(" ")
+    if(isinstance(receivedData,str) 
+       and (receivedData[stringLength-1] == "\n")
+       and (streamServerDataList[0] == BATCHIDENTIFIER)
+       and (
+            (streamServerDataList[1] == "STATUS") or (streamServerDataList[1] == "BYE") 
+            )):
+        return
+    else:
+        print "ERROR: Server string not as expected"
+        print "Terminating connection..."
+        closeAndExitConnection()
+            
+streamSocket        =   socket.socket(socket.AF_INET,socket.SOCK_STREAM,0)
+
+if(SSL_REQUESTED):
+    wrappedSocket   =   ssl.wrap_socket(streamSocket, ssl_version=ssl.PROTOCOL_TLSv1)
+
+try:
+    if(SSL_REQUESTED):
+        wrappedSocket.connect((REMOTE_HOST,REMOTE_PORT))
+    else:
+        streamSocket.connect((REMOTE_HOST,REMOTE_PORT)) 
+#except Exception, e:
+except socket.error as e:
+    print("Cannot connect to ")
+    print(REMOTE_HOST+" on port: "+str(REMOTE_PORT))
+    print(e)    
+    print ('something\'s wrong with %s:%d. Exception type is %s' % (REMOTE_HOST, REMOTE_PORT, `e`))
+    sys.exit()
+
+
+numberOfOperations   =   0
+# Send the initial greeting to server with NEU ID
+if(SSL_REQUESTED):
+    wrappedSocket.send(BATCHIDENTIFIER+" HELLO "+NEUID+"\n")
+else:
+    streamSocket.send(BATCHIDENTIFIER+" HELLO "+NEUID+"\n")
+
+# Expected server data format:
+# cs5700fall2015 STATUS [a number] [a math operator] [another number]\n
+#      [0]         [1]     [2]           [3]               [4]
+
+while True:
+    if(SSL_REQUESTED):
+        streamServerData        =   wrappedSocket.recv(256)
+    else:
+        streamServerData        =   streamSocket.recv(256)
+        
+#    print "Received message from server: "+ streamServerData
+    messageFormatCheck(streamServerData)
+    streamServerDataList    =   streamServerData.split(" ")
+    if(streamServerDataList[1] == "STATUS"):
+        # PENDING
+        # Check if the arguments are numbers or not
+        firstNumber     =   int(streamServerDataList[2])
+        secondNumber    =   int(streamServerDataList[4])
+        operatorSymbol  =   streamServerDataList[3]
+#        print "Operation requested:"+str(firstNumber)+operatorSymbol+str(secondNumber)
+        computedResult  =   getResult(firstNumber,operatorSymbol,secondNumber)
+#        print "Computed Result is: "+str(computedResult)
+        numberOfOperations+=1
+        #Server expected response:
+        # cs5700fall2015  [the solution]\n
+        if(SSL_REQUESTED):
+            wrappedSocket.send(BATCHIDENTIFIER+" "+str(computedResult)+"\n")
+        else:
+            streamSocket.send(BATCHIDENTIFIER+" "+str(computedResult)+"\n")
+            
+    elif(streamServerDataList[1] == "BYE"):
+#        print "Number of operations performed: "+str(numberOfOperations)
+        print str(streamServerDataList[2]).strip()
+        closeAndExitConnection()
+    else:
+        # The received message is neither a STATUS nor a BYE
+        # Terminate the socket connection and exit
+        closeAndExitConnection()

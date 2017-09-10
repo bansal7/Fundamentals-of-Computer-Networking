@@ -1,0 +1,35 @@
+#!/usr/bin/python
+import sys
+import socket
+
+REMOTE_PORT = 80
+#REMOTE_HOST = "fring.ccs.neu.edu"
+REMOTE_HOST = "twitter.com"
+
+def closeAndExitConnection():
+	streamSocket.close()
+	sys.exit()
+
+streamSocket        =   socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+
+print ("Waiting to connect....")
+
+try:
+	streamSocket.connect((REMOTE_HOST,REMOTE_PORT))
+	print ("Connection done...")
+except socket.error as e:
+	print("Cannot connect to ")
+	print(REMOTE_HOST+" on port: "+str(REMOTE_PORT))
+	print(e)
+	print ('something\'s wrong with %s:%d. Exception type is %s' % (REMOTE_HOST, REMOTE_PORT, `e`))
+	sys.exit()
+
+clientRequestMessage = "GET /robots.txt HTTP/1.0\n\n"
+streamSocket.send(clientRequestMessage)
+
+while True:
+	serverResponseMessage	=	streamSocket.recv(1024)
+	if serverResponseMessage == "": break
+	print "========================================================\n"+ serverResponseMessage,
+
+closeAndExitConnection()

@@ -1,0 +1,50 @@
+Amit Kulkarni
+001611108
+
+Bansal Shah
+001617243
+
+High Level Approach:
+
+1.	The program initally fetches the home page (http://fring.ccs.neu.edu) using a GET request
+2.	We navigate to the login page at http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/
+3.	Submit the username and password assigned to the same page using a POST request
+4.	We maintain 4 arrays : visited_links,links_to_visit and secret_flags which are used for 
+	the following purpose:
+	a. visited_links : Stores the URL's already visited by the crawler
+	b. links_to_visit: Stores the URL's the crawler has to visit
+	c. secret_flags: Stores a list of secret flags found by the crawler as it navigates from 
+			 page to page
+5.	We use a for loop to crawl different pages. Every link to be visited from the array 
+	links_to_visit, should not be in the array of visited_links and the number of secret flags 
+	should not be greater than 5
+6.	Within the for loop, we add the current visited link to the array of visited_links if the
+	response HTTP status is 200.Otherwise if the status is 500, the current link is added back
+	to the array of links_to_visit.
+7.	Within the for loop, if the response status of GET request is 200, we parse the HTML content
+	to find additional links that match the regex: "/fakebook/*[0-9]"
+8.	We also parse the received HTML in for loop to find out secret flags and if found, we append
+	that into the secret_flags array
+9.	If the response status of GET request in the for loop is 301 or 302, we fetch the new location
+	given by the response header and add that link to the array of links_to_visit     	
+
+Challenges faced:
+
+1.	Without using any additional libraries of python to create,fetch and parse GET/POST requests,
+	we faced several issues to get the first raw GET request right.
+2.	Since there is very less documentation of raw GET requests in Python, we spent a lot of time
+	debugging trying to create a correct GET request with the right number of Carriage return and 
+	line feeds
+3.	Due to less documentation and examples for using HTML Parser in Python, it was time consuming to 
+	parse the given HTML to extract the data we want
+4.	After a few requests, we realized that the initial session ID cookie changes after we login.
+	So, we had to use the new session ID cookie for further requests
+
+
+Overview of how we tested the code:
+
+1.	We started testing every module one after the other as per our high-level approach.
+2.  After every GET and POST request we checked for the output by printing it out and
+    rectifying it for correctness.
+3.  We checked for the secret flags, checked for the number of pages crawled and also for
+    page number on which the secret flags were found.

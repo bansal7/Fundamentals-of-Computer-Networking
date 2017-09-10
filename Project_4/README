@@ -1,0 +1,64 @@
+Amit Kulkarni
+001611108
+
+Bansal Shah
+001617243
+
+High Level Approach:
+
+1.	The program creates two raw sockets, one for receiving packets and one for sending packets.
+2.	The receive socket is of type SOCK RAW/IPPROTO TCP and the send socket is of type SOCK RAW/ IP-
+	PROTO RAW
+3.	We try to establish a connection with the remote server of the url or the filename specified.
+4.	We perform a three-way handshake with the server by first sending a SYN request and waiting for it
+	respond with the SYN-ACK and then finishing the handshake with the an ACK response.
+5.	Our code also checks for the basic timeout functionality in which if a packet is not ACKed within
+	1 minute, we assume the packet is lost and we retransmit it.
+6.	After a connection is established, we create an HTTP GET message requesting for data from the server.
+7.	We send the GET message via TCP socket.
+8.	Then we filter the HTTP response to check if it is from the desired server address.
+9.	After getting the response, we parse the HTTP header to get the associated web page or file, and
+	save it to the current directory. The program deletes the created file if the HTTP status code is not 200.
+	Before writing the contents of a file with HTTP status 200, the HTTP header and extra data related to 
+	content length in a chunked response is removed. We send ACK for every packet received and also check 
+	if we receive out-of-order incoming packets and ask the server for the correct packet so that we can 
+	put them back into the correct order before delivering them to the higher-level, HTTP handling code.
+10.	Our code also checks to ensure that all incoming packets have valid checksums in both TCP and IP.
+11.	Then we perform a connection teardown when the server sends a FIN-ACK request. The program responds with
+    an ACK response. After this, the program sends a FIN-ACK to complete the connection teardown.
+
+TCP features implemented:
+
+1.	The program assembles and disassembles TCP Packet by creating the TCP packet with all required fields and
+    unpacks the received TCP packets to fetch the required fields.
+2.	The program performs 3-way handshake by sending a SYN packet, getting a SYN-ACK response and finishing 
+    the handshake by sending an ACK to the server.
+3.	The program performs a complete tear down of connection with the server by 
+    i) Waiting for a FIN-ACK from the server.
+    ii) Responding with an ACK for the FIN-ACK
+    iii) Sending a FIN-ACK to indicate that client has no more data to send.
+4.	We also send TCP Packets through IP socket and also receive TCP Packets through IP socket.
+
+
+IP features implemented:
+
+1.	The program assembles and disassembles IP Packet by creating the IP packet with all required fields and
+    unpacks the received TCP packets to fetch the required fields.
+2.  The program unpacks the reeived packet and extract the IP header, TCP header and data part of the packet. 
+3.  After unpacking the packet, we calculate both the IP and TCP checksum and verify it with the checksum
+    which was sent. If the checksums do not match, the program sends a duplicate ACK of last received packet
+    to indicate the server that the latest packet is in error and it has to send it again.
+
+Challenges faced:
+
+1.	Since we were building the program incrementally, we wanted to first perform the handshake, receive data
+    and then perform connection teardown. During the handshake phase testing, ccs servers blocked our future
+    requests since teardown code was not written yet. So we had to wait 10-15 minutes before the server unblocked
+    us and started responding to our SYN requests.
+2.	We initially assumed that the server will respond with a 200 OK status for the GET request in order and wrote
+    the code but then we realized that even the 200 OK packet can arrive out of order in poor connetions.
+    So handling the in-order packet delivery feature was a challenge.
+3.	It took us some time to figure out a way to ignore the ACK request for our GET request since it was not consistent
+    response from all servers. Some servers chose to respond to our GET requests with a PSH-ACK instead of a single ACK.
+4.	We also had difficulties while setting the appropriate flags while sending the different requests
+	to the remote server.

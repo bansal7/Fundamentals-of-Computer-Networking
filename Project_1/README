@@ -1,0 +1,34 @@
+Names and NUID's:
+1. Amit Kulkarni- 001611108
+2. Bansal Shah- 001617243
+
+
+ High-level approach:
+ 
+ # Accept the port,SSL parameter, hostname and the NEU ID from the command line 
+ # Parse the arguments to check for 
+   1. If '-p' is given, a port number has to be given mandatorily
+   2. If '-s' is given, a secure socket layer connection has to be established
+   3. If hostname or NEU ID is not given, show an error of "too few arguments"
+ # If an SSL connection is requested, we wrap the plain socket connection with ssl.PROTOCOL_TLSv1 and make the connection
+ # If SSL connection is not requested, we create a simple plain socket connection using socket.socket()
+ # We start the connection by sending the following HELLO message to the given hostname server
+   "cs5700fall2015 HELLO [NEU ID] \n"
+ # We enter a loop listening for messages from server
+ # Once a message is received from server,we parse the received message to check if it is one of the following messages:
+   "cs5700fall2015 STATUS [ a number ] [ a math operator ] [ another number] \n"
+   or
+   "cs5700fall2015 [ a 64 byte secret flag ] BYE\n"
+ # If the server responds with an expression, we respond with the answer of the expression in the format:
+   "cs5700fall2015 [ the solution ] \n"
+ # If the server responds with a BYE message, we extract the secret flag and display it
+ 
+ Challenges faced:
+ # Division by zero operations 
+ # Converting all answers to integers
+ # Wrapping the plain socket connection to SSL connection using 
+ 
+ Overview of how we tested our code:
+ # We created our server script which worked like the actual server
+ # This server sent all possible erroneous messages with wrong formats, division by zero, expressions that resulted in floating point numbers
+ # Once the actual server was up we tested our client script and got the correct answers

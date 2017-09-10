@@ -1,0 +1,68 @@
+#!/usr/bin/python
+import sys
+import subprocess
+import os
+
+PATH      = os.path.dirname(os.path.realpath(__file__))
+os.chdir(PATH)
+
+if len(sys.argv) > 1:
+	# Initial Input CBR value
+    	INITIAL_CBR	=	sys.argv[1]
+else:
+   	print "Please provide a starting CBR number less than 10.5"
+	sys.exit()
+
+# Find out the path of NS
+NS	= 	subprocess.check_output("whereis ns | awk '{print $2}'", shell=True).strip()
+
+# Set the Maximum value of CBR
+MAXCBR	=	10.5
+
+# Increment factor
+INCREMENT_FACTOR	=	0.5
+
+# CBR Counter
+cbr = float(INITIAL_CBR)
+
+# Converter
+kbps_to_mbps = (1024*1024)
+
+# Flush the old file 
+subprocess.check_output("rm -f newrenothroughput.txt",shell=True)
+subprocess.check_output("rm -f newrenodroprate.txt",shell=True)
+subprocess.check_output("rm -f newrenolatency.txt",shell=True)
+
+while (cbr < MAXCBR):
+	# Call the TCL script
+	tcl_output = subprocess.check_output(NS+" newrenotcp.tcl "+str(cbr),shell=True).strip()
+	tcl_output_result = (float(tcl_output)/kbps_to_mbps)
+	tcp_kbps_throughput = subprocess.check_output("awk -f tcp-throughput-generator.awk newreno.tr",shell=True).strip()
+	f = open("newrenothroughput.txt",'a')
+	f.write(str(cbr)+ " " + tcp_kbps_throughput+"\n")
+
+	packets_dropped = subprocess.check_output("awk '/^d/&&$3==1&&$5==\"tcp\"' newreno.tr | wc -l",shell=True).strip()
+	packets_sent = subprocess.check_output("awk '/^-/&&$3==0&&$5==\"tcp\"' newreno.tr|wc -l",shell=True).strip()
+#	print "Packets dropped: "+packets_dropped
+#	print "Packets sent: "+packets_sent
+	drop_rate = float(packets_dropped)/float(packets_sent)
+#	print "Drop rate for CBR "+str(cbr)+" = "+ str(drop_rate)
+#	print "==========================================="
+	pd = open("newrenodroprate.txt",'a')
+	pd.write(str(cbr)+ " " + str(round ((drop_rate*100),2))+"\n")
+
+	latency = subprocess.check_output("awk -f tcp-delay-calculator.awk newreno.tr",shell=True).strip()
+	latency_ms = round((float(latency) * 1000),3)
+	l = open("newrenolatency.txt",'a')
+	l.write(str(cbr)+ " " + str(latency_ms)+"\n")
+	#print str(latency_ms)
+
+	cbr=cbr+INCREMENT_FACTOR
+ 
+f.close()
+pd.close()
+l.close()
+
+print "==============================="
+print "End of TCP Newreno CBR Variations"
+print "==============================="

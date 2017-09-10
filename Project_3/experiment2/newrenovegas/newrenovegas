@@ -1,0 +1,111 @@
+#!/usr/bin/python
+import sys
+import subprocess
+import os
+
+PATH      = os.path.dirname(os.path.realpath(__file__))
+os.chdir(PATH)
+
+if len(sys.argv) > 1:
+	# Initial Input CBR value
+    	INITIAL_CBR	=	sys.argv[1]
+else:
+   	print "Please provide a starting CBR number less than 10.5"
+	sys.exit()
+
+# Find out the path of NS
+NS			= 	subprocess.check_output("whereis ns | awk '{print $2}'", shell=True).strip()
+
+# Set the Maximum value of CBR
+MAXCBR			=	10.5
+
+# Increment factor
+INCREMENT_FACTOR	=	0.5
+
+# CBR Counter
+cbr 			=	float(INITIAL_CBR)
+
+# Trace file
+TRACEFILE		=	"newrenovegas.tr"
+
+
+# Flush the old file 
+subprocess.check_output("rm -f newrenothroughput.txt newrenodroprate.txt newrenolatency.txt",shell=True)
+subprocess.check_output("rm -f vegasthroughput.txt vegasdroprate.txt vegaslatency.txt",shell=True)
+
+
+# Create file descriptors for while loop to use and write
+f1   = open("newrenothroughput.txt",'a')
+f2   = open("vegasthroughput.txt",'a')
+pdd1 = open("newrenodroprate.txt",'a')
+pdd2 = open("vegasdroprate.txt",'a')
+l1   = open("newrenolatency.txt",'a')
+l2   = open("vegaslatency.txt",'a')
+
+while (cbr < MAXCBR):
+	# Call the TCL script
+
+	subprocess.check_output(NS+" newrenovegas.tcl "+str(cbr),shell=True).strip()
+
+	# Throughput measurements
+	newreno_kbps_throughput = subprocess.check_output("awk -f tcp-tp-0-3.awk " + TRACEFILE,shell=True).strip()
+	vegas_kbps_throughput = subprocess.check_output("awk -f tcp-tp-4-5.awk " + TRACEFILE,shell=True).strip()
+
+	newreno_kbps_throughput = round(float(newreno_kbps_throughput),2)
+	vegas_kbps_throughput = round(float(vegas_kbps_throughput),2)
+
+	f1.write(str(cbr)+ " " + str(newreno_kbps_throughput)+"\n")
+	f2.write(str(cbr)+ " " + str(vegas_kbps_throughput)+"\n")
+
+
+	# Packet drop measurements
+	pd1 = subprocess.check_output("awk '/^d/&&$3==1&&$5==\"tcp\"&&$8==1' "+TRACEFILE+" | wc -l",shell=True).strip()
+	ps1 = subprocess.check_output("awk '/^-/&&$3==0&&$5==\"tcp\"&&$8==1' "+TRACEFILE+" | wc -l",shell=True).strip()
+	drop_rate_newreno = float(pd1)/float(ps1)
+	pd2 = subprocess.check_output("awk '/^d/&&$3==1&&$5==\"tcp\"&&$8==3' "+TRACEFILE+" | wc -l",shell=True).strip()
+	ps2 = subprocess.check_output("awk '/^-/&&$3==4&&$5==\"tcp\"&&$8==3' "+TRACEFILE+" | wc -l",shell=True).strip()
+	drop_rate_vegas = float(pd2)/float(ps2)
+
+	pdd1.write(str(cbr)+ " " + str(round ((drop_rate_newreno*100),2))+"\n")
+	pdd2.write(str(cbr)+ " " + str(round ((drop_rate_vegas*100),2))+"\n")
+
+	latency1 = subprocess.check_output("awk -f tcp-lat-0-3.awk " + TRACEFILE,shell=True).strip()
+	latency1_ms = round((float(latency1) * 1000),3)
+	latency2 = subprocess.check_output("awk -f tcp-lat-4-5.awk " + TRACEFILE,shell=True).strip()
+	latency2_ms = round((float(latency2) * 1000),3)
+
+	l1.write(str(cbr)+ " " + str(latency1_ms)+"\n")
+	l2.write(str(cbr)+ " " + str(latency2_ms)+"\n")
+
+	cbr=cbr+INCREMENT_FACTOR
+
+
+# Close the open file descriptors
+f1.close()
+f2.close()
+pdd1.close()
+pdd2.close()
+l1.close()
+l2.close()
+
+# Combine the throughput results of both TCP variants
+subprocess.check_output("paste newrenothroughput.txt vegasthroughput.txt | awk '{print $1,$2,$4}' > newrenovegastcp-tp.txt",shell=True).strip()
+
+# Combine the Packet Drop rate results of both TCP variants
+subprocess.check_output("paste newrenodroprate.txt vegasdroprate.txt | awk '{print $1,$2,$4}' > newrenovegastcp-pd.txt",shell=True).strip()
+ 
+# Combine the Packet Drop rate results of both TCP variants
+subprocess.check_output("paste newrenolatency.txt vegaslatency.txt | awk '{print $1,$2,$4}' > newrenovegastcp-l.txt",shell=True).strip()
+
+# Cleanup
+
+# Remove the helper files (OPTIONAL)
+subprocess.check_output("rm -rf newrenothroughput.txt vegasthroughput.txt",shell=True)
+subprocess.check_output("rm -rf newrenodroprate.txt vegasdroprate.txt",shell=True)
+subprocess.check_output("rm -rf newrenolatency.txt vegaslatency.txt",shell=True)
+
+#l.close()
+
+print "======================================="
+print "End of TCP NewReno-Vegas CBR Variations"
+print "======================================="
